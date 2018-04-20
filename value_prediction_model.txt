@@ -19,8 +19,7 @@ head(game)
 library(dplyr)
 
 
-# reorginising the dataset
-
+# reorginizing the dataset
 # the points and values for each player are in rows, but they should be in columns
 game = game %>% arrange(id, round)
 predict_game = reshape(game, idvar = 'id', timevar = 'round', direction = "wide")
@@ -37,17 +36,14 @@ predict_game = predict_game[, !(names(predict_game) %in% drop)]
 head(predict_game)
 
 # the variable "team.0" and "id" is not necessary - it is also erased
-
 predict_game = predict_game[, -c(1,2)]
 head(predict_game)
 
 # checking the lack of data in the dataset
-
 library(Amelia)
 missmap(predict_game, legend = TRUE)
 
 # for using the neural net for prediction we need the rows with full data
-
 # deleting the rows with the lack of data
 library(tidyr)
 predict_game_clean = predict_game %>% drop_na()
@@ -55,11 +51,11 @@ predict_game_clean = predict_game %>% drop_na()
 # the structure of the final data.frame
 str(predict_game_clean)
 
-# 
+# libraries necessary
 library(nnet)
 library(caret)
-# Normalization
 
+# Normalization
 preProcValues <- preProcess(predict_game_clean, method = c("range"))
 predict_game_nn <- predict(preProcValues, predict_game_clean)
 str(predict_game_nn)
@@ -71,9 +67,7 @@ rm(game, participants, performance, predict_game, predict_game_clean, preProcVal
 correct_ratio_test_nn_100 = c()
 
 # Formula
-
 formula_1 = value.20 ~ .
-
 
 # The split into the training set and test set. It is done in the loop for gathering the
 # multiple results from the model performance, with different training set and test set
@@ -87,18 +81,16 @@ training_set_nn = predict_game_nn[index,]
 test_set_nn = predict_game_nn[-index,]
 
 # neural net training
-
 model_nn = nnet(formula = formula_1, data = training_set_nn, size = 3, decay = 4e-4,
                 linout = TRUE)
 
-# test sieci neuronowej 
+# testing the neural net
 nn.results <- predict(model_nn, test_set_nn[,1:42])
 
 table_res_nn = cbind(nn.results, test_set_nn[,43])
 table_res_nn = as.data.frame(table_res_nn)
 
 # minus values as 0
-
 table_res_nn$V1[table_res_nn$V1 < 0] = 0
 
 # Scailing by 30 (max - min), creating two new variables, rounding the results of the model to integers
@@ -117,15 +109,14 @@ correct_ratio_test_nn = sum(table_res_nn$difference)/length(table_res_nn$differe
 correct_ratio_test_nn_100[i] = correct_ratio_test_nn
 }
 
-# Podsumowanie predykcji modelu w 100 iteracjach:
-
-# Wektor procentowej poprawnosci predykcji w kazdej iteracji:
+# Summary:
+# Vector of the accuracy of the prediction of the model in 100 iterations:
 correct_ratio_test_nn_100
-# Sredni wynik modelu
+# Mean value for the accuracy
 mean_val_nn = mean(correct_ratio_test_nn_100)
-# Odchylenie standardowe
+# Standard deviation
 sd_val_nn = sd(correct_ratio_test_nn_100)
-# Wyniki
+# Results
 mean_val_nn
 sd_val_nn
 
