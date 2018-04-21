@@ -1,1 +1,1 @@
-Results of the internet game called "Dota 2". The classification problem includes predicting the result of the game with data about chosen characters in the game and location.
+Results of the internet game called "Dota 2". The classification problem includes predicting the result of the game with data about chosen characters in the game and location. For prediction the logistic regression and decision tree were used to compare the methods.
