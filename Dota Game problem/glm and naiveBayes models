@@ -1,0 +1,70 @@
+setwd("C:/Users/tomas/OneDrive/Dokumenty/MCI datasets/dota2Dataset")
+
+df = read.csv("dota2Train.csv", header = T)
+df_backup = df
+
+# Gathering information about counts each character was played
+sapply(df, table)
+# this tables list shows that particular character, who is represented by the variables 'X0.97' or 'X0.19' was 
+# never chosen in the game, so it can be deleted from the dataset.
+
+# Vector 'drop' represents the variables, which will be deleted from the dataset
+drop = c('X0.97', 'X0.19')
+
+# Dropping the columns
+df = df[, !(names(df) %in% drop)]
+ 
+# Checking the dimensions
+dim(df)
+
+# Backup just in case 
+#df_backup = df
+
+# Normalization process
+preProcValues <- preProcess(df, method = c("range"))
+df_norm <- predict(preProcValues, df)
+summary(df_norm)
+
+# Converting the dependant variable to factor
+df_norm$X.1 = factor(df_norm$X.1)
+str(df_norm)
+head(df_norm$X.1)
+
+# Subsample from the large, original dataset
+index1 = sample(dim(df_norm)[1], 0.1*dim(df_norm)[1])
+subs = df_norm[index1,]
+index2 = sample(dim(subs)[1], 0.7*dim(subs)[1])
+subs_tr = subs[index2,]
+subs_ts = subs[-index2,]
+
+# Deleting the irrelevant R objects
+rm(drop, index1, index2, preProcValues)
+
+# logistic regression model
+
+glm.model = glm(formula = X.1 ~., family = binomial(link = "logit"), data = subs_tr)
+
+# glm model prediction
+glm.results = predict(glm.model, subs_ts[,2:115])
+head(glm.results)
+table(subs_ts[,1])
+table(glm.results)
+
+glm.results[glm.results > 0] = '1'
+glm.results[glm.results != '1'] = '0'
+
+confusionMatrix(table(glm.results, subs_ts[,1]))
+
+# For comparison the naive Bayes algorithm is used.
+
+str(df_norm)
+nb.model = naiveBayes(formula = X.1 ~ ., data = subs_tr)
+
+# prediction
+
+nb.results = predict(nb.model, subs_ts[,2:115])
+head(nb.results)
+
+confusionMatrix(table(nb.results, subs_ts[,1]))
+
+Summary:..
