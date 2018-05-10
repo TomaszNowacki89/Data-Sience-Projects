@@ -1,0 +1,35 @@
+# Functions used in the project:
+
+# Function checks how many data is missing in every vector
+no_data = function(vec){
+  length(which(is.na(vec) == TRUE)) 
+}
+
+# Function deletes the columns with only one unique value
+delOneValued <- function(input)
+{
+  res <- c(which(sapply(input, function(x) {length(unique(x))}) == 1));
+  if(length(res) > 0)         
+  {
+    data1 <- input[,-res];
+  }   
+  else
+  {
+    data1 <-input;
+  }
+  data1 
+}
+
+# Function deletes the columns with the number of unique values equal to number of rows
+delUniqueValueAtt<- function(inputData11)
+{
+  res <- c(which(sapply(inputData11, function(x) {length(unique(x))}) == nrow(inputData11)));
+  if(length(res) >0)         
+  {
+    data11 <- inputData11[,-res];
+  }   
+  else
+  {
+    data11 <-inputData11;
+  }
+}
