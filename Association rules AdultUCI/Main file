@@ -1,0 +1,190 @@
+# Data Mining Association Rules
+# The topic considers finding the association rules in the AdultUCI dataset.
+# The main focus is to find the association rule between the level of education and the profession of
+# the people in the dataset.
+
+# Loading libraries
+library(arules)
+library(Matrix)
+library(dplyr)
+library(plyr)
+
+# loading data
+data("AdultUCI")
+
+# Working copy of the dataset
+AdultUCI_1 = AdultUCI
+
+# Checking the basic information about dataset
+colnames(AdultUCI)
+dim(AdultUCI)
+str(AdultUCI)
+class(AdultUCI)
+
+#################### DATA TRANSFORMATION OPERATIONS ####################
+
+# Checking the data completeness
+lapply(AdultUCI_1, no_data)
+
+# Conclusion: In columns workclass, occupation, native-country, income the data is missing
+
+# Checking the quantity of full rows and rows with missing data
+sum(complete.cases(AdultUCI_1))
+sum(is.na(AdultUCI_1))
+
+# Deleting the one value variables
+delOneValued(AdultUCI_1)
+dim(AdultUCI_1)
+# The dimension of the dataframe did not change. None of the variables were deleted
+
+# Deleting the variables with only the unique values
+# Checking
+which(sapply(AdultUCI, function(x) {length(unique(x))}) == nrow(AdultUCI))
+# No columns with only unique values, no need to delete any
+
+# Checking and deleting duplicates
+length(which(duplicated(AdultUCI_1) == TRUE))
+AdultUCI_1 = unique(AdultUCI_1)
+dim(AdultUCI_1)
+# 30 duplicates were deleted
+
+# Deleting columns: fnlwgt, education-num, capital loss, capital gain
+colnames(AdultUCI_1)
+delete = c('fnlwgt', 'education-num', 'capital-loss', 'capital-gain')
+del_columns = c()
+for (i in 1:length(delete)){
+  del_columns[i] = which(colnames(AdultUCI_1) == delete[i])
+}
+
+AdultUCI_1 = AdultUCI_1[,-del_columns]
+dim(AdultUCI_1)
+
+############## DISCRETIZATION AND REDUCTION OF THE FEATURES #################
+
+AdultUCI_1.1 = AdultUCI_1
+# Discretizing age
+
+AdultUCI_1.1$age  <- ordered(cut(AdultUCI_1.1[["age"]],
+                               c(15,25,65,100)),
+                           labels = c("Before-Job-Age", "Job-Age", "Retired"))
+
+# Reducing the education values
+educ_levels = c("Preschool"="Preschool", "1st-4th"="HS-Dropout", "5th-6th" = "HS-Dropout",
+               "7th-8th" = "HS-Dropout", '9th' = "HS-Dropout", '10th' = "HS-Dropout",
+               '11th' = "HS-Dropout", '12th' ="HS-Dropout", 'HS-grad' = "Hs-grad",
+               "Prof-school" = "Prof-school", "Assoc-acdm" = "Assoc", "Assoc-voc" = "Assoc", "Some-college" = "College",
+               "Bachelors"="Bachelors", "Masters"="Masters", "Doctorate"="Doctorate")
+revalue(AdultUCI_1.1$`education`, educ_levels) -> AdultUCI_1.1$`education`
+
+# Reducing the marital status values
+marital_levels = c("Divorced"="Not-married", "Married-AF-spouse"="Married", "Married-civ-spouse" = "Married",
+                "Married-spouse-absent" = "Married", 'Never-married' = "Not-married",
+                'Separated' = "Separated", 'Widowed' ="Widowed")
+
+revalue(AdultUCI_1.1$`marital-status`, marital_levels) -> AdultUCI_1.1$`marital-status`
+
+# Reducing the workclass values
+workclass = levels(AdultUCI_1.1$workclass)
+AdultUCI_1.1$workclass = factor(AdultUCI_1.1$workclass,levels = c(workclass, "No-info"))
+AdultUCI_1.1$workclass[is.na(AdultUCI_1.1$workclass)] = "No-info"
+
+workclass = c( "Federal-gov"='Government', "Local-gov"='Government', "Never-worked"='No-job',
+               "Private"="Private", "Self-emp-inc"="Self-emp", "Self-emp-not-inc"="Self-emp",
+               "State-gov" = "Government", "Without-pay"="No-job")
+revalue(AdultUCI_1.1$workclass, workclass) -> AdultUCI_1.1$workclass
+
+# Reducing the occupation values
+occupation = levels(AdultUCI_1.1$occupation)
+AdultUCI_1.1$occupation = factor(AdultUCI_1.1$occupation, levels = c(occupation, "No-info"))
+AdultUCI_1.1$occupation[is.na(AdultUCI_1.1$occupation)] = "No-info"
+
+occupation = c("Adm-clerical"="Service", "Armed-Forces"="Service", "Craft-repair"="Physical",
+               "Exec-managerial"='Menager', "Farming-fishing"="Physical", "Handlers-cleaners" = "Physical",
+               "Machine-op-inspct"="Specialist", "Other-service"="Service", "Priv-house-serv"="Service",
+               "Prof-specialty"="Specialist", "Protective-serv"="Service", "Sales"="Service",
+               "Tech-support"="Specialist", "Transport-moving"="Service")
+
+revalue(AdultUCI_1.1$occupation, occupation) -> AdultUCI_1.1$occupation
+
+# Discretizing hours per week
+AdultUCI_1.1[['hours-per-week']]  <- ordered(cut(AdultUCI_1.1[["hours-per-week"]],
+                                       c(1,35,40,45,99),
+                                       labels = c("Part-time", "Full-time", "Overtime", "High-overtime")))
+
+# Changing country values
+
+countries = levels(AdultUCI_1.1$`native-country`)
+levels(AdultUCI_1.1$`native-country`)
+AdultUCI_1.1$`native-country` = factor(AdultUCI_1.1$`native-country`, levels = c(countries, "No-info"))
+AdultUCI_1.1$`native-country`[is.na(AdultUCI_1.1$`native-country`)] = "No-info"
+
+countries = c("Cambodia"="Foreign", "Canada"="Foreign", "China"="Foreign",
+               "Columbia"='Foreign', "Cuba"="Foreign", "Dominican-Republic" = "Foreign",
+               "Ecuador"="Foreign", "El-Salvador"="Foreign", "England"="Foreign",
+               "France"="Foreign", "Germany"="Foreign", "Greece"="Foreign",
+               "Guatemala"="Foreign", "Haiti"="Foreign",
+              "Holand-Netherlands"="Foreign", "Honduras"="Foreign", "Hong"="Foreign", "Hungary"="Foreign",
+              "India"='Foreign', "Iran"="Foreign", "Ireland"="Foreign",
+              "Italy"="Foreign", "Jamaica"="Foreign", "Japan"="Foreign",
+              "Laos"="Foreign", "Mexico"="Foreign", "Nicaragua"="Foreign",
+              "Outlying-US(Guam-USVI-etc)"='Foreign', "Peru"="Foreign",
+              "Philippines" = "Foreign",
+              "Poland"="Foreign", "Portugal"="Foreign", "Puerto-Rico"="Foreign",
+              "Scotland"="Foreign", "South"="Foreign", "Taiwan"="Foreign",
+              "Thailand"="Foreign", "Trinadad&Tobago"="Foreign",
+              "United-States"="United-States", "Vietnam"="Foreign", "Yugoslavia"="Foreign")
+
+revalue(AdultUCI_1.1$`native-country`, countries) -> AdultUCI_1.1$`native-country`
+
+str(AdultUCI_1.1)
+
+############################ ASSOCIATE RULES FINDING ########################################
+
+# Conversion to transactions
+
+AdultUCI_1.1tr = as(AdultUCI_1.1, "transactions")
+AdultUCI_1.1tr
+summary(AdultUCI_1.1tr)
+
+# Analysis
+
+# Item frequency
+
+freqTbl  = itemFrequency(AdultUCI_1.1tr, type = "relative")
+str(freqTbl)
+
+itemFrequencyPlot(AdultUCI_1.1tr, type ="relative", support= 0.9)
+
+# Choosing parameters:
+aparam  = new("APparameter", "confidence" = 0.2, "support" =0.05, "minlen"= 2, "maxlen"=2)
+print(aparam)
+
+# Detecting frequent sets
+# Using apriori function to detect associate rules
+aRules <- apriori(AdultUCI_1.1tr,aparam)
+summary(aRules)
+
+length(aRules)
+# From these rules we detect those concerning education and profession
+
+# Filtering all rules with education:
+aRulesEd = subset(aRules, subset = items %pin% "education")
+length(aRulesEd)
+# From this set choosing the ones with occupation
+aRulesEdOc = subset(aRulesEd, subset = items %pin% "occupation")
+length(aRulesEdOc)
+inspect(aRulesEdOc)
+# Inspecting them sorting by lift
+inspect(sort(aRulesEdOc, by="lift"))
+
+# Choosing interesting rules
+# Lift > 1.2
+rulesLift1.2 <- subset(aRulesEdOc, subset =  lift > 1.2)
+# Inspection
+inspect(sort(rulesLift1.2, by="confidence"))
+
+# Three chosen rules with highest confidence
+#     lhs                        rhs                     support    confidence lift     count
+# [1] {education=College}     => {occupation=Service}    0.10808818 0.4854172  1.207470 5276 
+# [2] {occupation=Physical}   => {education=Hs-grad}     0.09063345 0.4577341  1.416260 4424 
+# [3] {education=Bachelors}   => {occupation=Specialist} 0.05482258 0.3336658  1.532019 2676
