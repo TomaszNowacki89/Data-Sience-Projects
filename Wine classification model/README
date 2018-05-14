@@ -1,3 +1,4 @@
 The project I did during my postgraduate studies, which uses the decision tree for classifing the red wines into two categories:
 1) Wine worth buying
 2) Wine not worth buying
+Also I use the naiveBayes classificator for comparison.
