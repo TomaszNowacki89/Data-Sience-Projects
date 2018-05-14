@@ -1,0 +1,163 @@
+# libraries
+library(caret)
+library(stats)
+
+# loading data
+df = read.csv("dota2Train.csv", header = T)
+
+# Removing columns with one value function
+delOneValued <- function(input)
+{
+  res <- c(which(sapply(input, function(x) {length(unique(x))}) == 1));
+  if(length(res) > 0)         
+  {
+    data1 <- input[,-res];
+  }   
+  else
+  {
+    data1 <-input;
+  }
+  data1 
+}
+# Nomalization function
+normalize <- function(x) {
+  return ((x - min(x)) / (max(x) - min(x)))
+}
+
+
+######################################################################
+################## LOGISTIC REGRESSION APPROACH ######################
+######################################################################
+
+# normalization
+df_norm = as.data.frame(lapply(df, normalize))
+head(df_norm)
+
+# Converting the dependant variable to factor
+df_norm$X.1 = factor(df_norm$X.1)
+str(df_norm)
+head(df_norm$X.1)
+
+df_norm = delOneValued(df_norm)
+
+# Subsample from the large, original dataset
+index1 = sample(dim(df_norm)[1], 0.01*dim(df_norm)[1])
+subs = df_norm[index1,]
+index2 = sample(dim(subs)[1], 0.7*dim(subs)[1])
+subs_tr = subs[index2,]
+subs_ts = subs[-index2,]
+
+# Deleting the irrelevant R objects
+rm(index1, index2)
+
+# logistic regression model
+glm.model = glm(formula = X.1 ~., family = binomial(link = "logit"), data = subs_tr)
+summary(glm.model)
+
+# glm model prediction
+glm.results = predict(glm.model, subs_ts[,2:115])
+head(glm.results, 5)
+summary(glm.results)
+m = mean(glm.results)
+
+glm.results[glm.results > m] = '1'
+glm.results[glm.results != '1'] = '0'
+
+confusionMatrix(table(glm.results, subs_ts[,1]))
+
+###############################################################
+################ DECISION TREE APPROACH #######################
+###############################################################
+
+df_tree = df
+df_tree = delOneValued(df_tree)
+str(df_tree)
+
+df_tree[1:dim(df_tree)[2]] = lapply(df_tree[1:dim(df_tree)[2]], as.factor)
+
+sort(table(df_tree$X223), decreasing = TRUE)
+frequent = c(227,154,156,151,153,152,155,224)
+
+for(i in 1:dim(df_tree)[1]){
+  if (df_tree$X223[i] %in% frequent == TRUE)
+    df_tree$X223f[i] = "Frequent"
+  else{df_tree$X223f[i] = "Other"}
+}
+
+df_tree$X223f = factor(df_tree$X223f)
+df_tree$X223 = NULL
+summary(df_tree)
+
+# Subsample from the large, original dataset
+index1 = sample(dim(df_tree)[1], 0.005*dim(df_tree)[1])
+subs = df_tree[index1,]
+index2 = sample(dim(subs)[1], 0.7*dim(subs)[1])
+subs_tr = subs[index2,]
+subs_ts = subs[-index2,]
+
+# Decision tree model
+
+library(rpart)
+
+model_tree = rpart(formula = X.1 ~ ., data = subs_tr, method = 'class',
+                   control = rpart.control(minsplit = 10, maxdepth = 10))
+summary(model_tree)
+results_tree = predict(model_tree, subs_ts[2:dim(df_tree)[2]])
+results_tree
+
+# Adjust the results according to the probabilities from tree
+as.data.frame(results_tree)
+colnames(results_tree)
+results_tree$fin = ifelse(results_tree[,1] > results_tree[,2], "-1", "1")
+results_tree$fin
+confusionMatrix(table(results_tree$fin, subs_ts[,1]))
+
+##################################################################
+################### RANDOM FOREST APPROACH #######################
+##################################################################
+
+library(randomForest)
+
+model_forest = randomForest(data = subs_tr, x = subs_tr[,2:115], y = subs_tr$X.1,
+                            ntree = 100, replace = TRUE, nodesize = 2)
+
+results_forest = predict(model_forest, subs_ts[2:115])
+results_forest
+
+confusionMatrix(table(results_forest, subs_ts[,1]))
+
+###################################################################
+#################### NAIVE BAYES APPROACH #########################
+###################################################################
+
+library(e1071)
+nb.model = naiveBayes(formula = X.1 ~ ., data = subs_tr)
+
+# prediction
+nb.results = predict(nb.model, subs_ts[,2:115])
+head(nb.results)
+confusionMatrix(table(nb.results, subs_ts[,1]))
+
+
+###################################################################
+######################### KNN APPROACH ############################
+###################################################################
+library(class)
+df_knn = df
+df_knn = delOneValued(df_knn)
+
+df_knn_gc = as.matrix(df_knn[2:115])
+df_knn_def = as.factor(df_knn[,1])
+
+index1 = sample(dim(df_knn)[1], 0.005*dim(df_knn)[1])
+subs = df_knn[index1,]
+index2 = sample(dim(subs)[1], 0.7*dim(subs)[1])
+subs_tr = subs[index2,]
+subs_ts = subs[-index2,]
+
+
+model_knn = knn(as.matrix(subs_tr[,2:115]), as.matrix(subs_ts[,2:115]), as.matrix(subs_tr[,1]),
+                k = 2)
+
+misclass_err = mean(subs_ts[,1] != model_knn)
+misclass_err
