@@ -1,2 +1,2 @@
 # Data-Sience-Projects
-The repository for all the data science projects I am doing
+The repository for all the data science projects I am doing as a hobby.
