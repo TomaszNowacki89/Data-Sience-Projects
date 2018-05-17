@@ -19,14 +19,15 @@ head(game)
 library(dplyr)
 
 
-# reorginizing the dataset
+# reorginising the dataset
+
 # the points and values for each player are in rows, but they should be in columns
 game = game %>% arrange(id, round)
 predict_game = reshape(game, idvar = 'id', timevar = 'round', direction = "wide")
 predict_game = as.data.frame(predict_game)
 head(predict_game)
 # now it is necessary to get rid of some columns
-class(predict_table)
+class(predict_game)
 drop = c("team.1","team.2","team.3","team.4","team.5","team.6","team.7","team.8",
                                  "team.9","team.10","team.11","team.12","team.13","team.14","team.15","team.16",
                                  "team.17","team.18","team.19","team.20","type.1","type.2","type.3","type.4",
@@ -35,15 +36,18 @@ drop = c("team.1","team.2","team.3","team.4","team.5","team.6","team.7","team.8"
 predict_game = predict_game[, !(names(predict_game) %in% drop)]
 head(predict_game)
 
-# the variable "team.0" and "id" is not necessary - it is also erased
+# the variable "team.0" and "id" is not necessary - it is deleted
+
 predict_game = predict_game[, -c(1,2)]
 head(predict_game)
 
 # checking the lack of data in the dataset
+
 library(Amelia)
 missmap(predict_game, legend = TRUE)
 
 # for using the neural net for prediction we need the rows with full data
+
 # deleting the rows with the lack of data
 library(tidyr)
 predict_game_clean = predict_game %>% drop_na()
@@ -51,11 +55,11 @@ predict_game_clean = predict_game %>% drop_na()
 # the structure of the final data.frame
 str(predict_game_clean)
 
-# libraries necessary
+# 
 library(nnet)
 library(caret)
-
 # Normalization
+
 preProcValues <- preProcess(predict_game_clean, method = c("range"))
 predict_game_nn <- predict(preProcValues, predict_game_clean)
 str(predict_game_nn)
@@ -67,7 +71,9 @@ rm(game, participants, performance, predict_game, predict_game_clean, preProcVal
 correct_ratio_test_nn_100 = c()
 
 # Formula
+
 formula_1 = value.20 ~ .
+
 
 # The split into the training set and test set. It is done in the loop for gathering the
 # multiple results from the model performance, with different training set and test set
@@ -81,16 +87,18 @@ training_set_nn = predict_game_nn[index,]
 test_set_nn = predict_game_nn[-index,]
 
 # neural net training
+
 model_nn = nnet(formula = formula_1, data = training_set_nn, size = 3, decay = 4e-4,
                 linout = TRUE)
 
-# testing the neural net
+# test sieci neuronowej 
 nn.results <- predict(model_nn, test_set_nn[,1:42])
 
 table_res_nn = cbind(nn.results, test_set_nn[,43])
 table_res_nn = as.data.frame(table_res_nn)
 
 # minus values as 0
+
 table_res_nn$V1[table_res_nn$V1 < 0] = 0
 
 # Scailing by 30 (max - min), creating two new variables, rounding the results of the model to integers
@@ -109,10 +117,11 @@ correct_ratio_test_nn = sum(table_res_nn$difference)/length(table_res_nn$differe
 correct_ratio_test_nn_100[i] = correct_ratio_test_nn
 }
 
-# Summary:
-# Vector of the accuracy of the prediction of the model in 100 iterations:
+# Summary of the 100 iterations in which the model had different training and test set:
+
+# Vector of classification error in these 100 iterations:
 correct_ratio_test_nn_100
-# Mean value for the accuracy
+# Mean of the vector representing the average accuracy of the model
 mean_val_nn = mean(correct_ratio_test_nn_100)
 # Standard deviation
 sd_val_nn = sd(correct_ratio_test_nn_100)
@@ -123,4 +132,4 @@ sd_val_nn
 # Conclusion:
 # The neural net predicts with very good accuracy the results in the last 20th round of the game
 # After looping the script one houndred times the mean value of the accuracy (mean_val_nn) is around
-# 98.7% with the standard deviation of 0.018%. The neural net uses 3 neurons in hidden layer.
+# 98.5% with the standard deviation of 0.019%. The neural net uses 3 neurons in hidden layer.
