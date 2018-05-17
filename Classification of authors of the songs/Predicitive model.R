@@ -1,0 +1,142 @@
+# Text Mining Project
+# Classification of the author of the song based on the lyrics
+
+# Description
+
+# Using text mining methods and k nearest neighbours algorithm to classify the 
+# author of the song
+
+# Genre: American Rap
+
+# Classification Classes:
+
+# Jay-Z and Nas
+
+# libraries
+library(tm)
+library(plyr)
+library(dplyr)
+library(class)
+library(caret)
+library(e1071)
+
+
+# set options
+options(stringsAsFactors = FALSE) #block this by FALSE
+
+# create vector with authors
+authors = c("Jay", "Nas")
+
+# pathname to the data
+pathname = "C:/Users/tomas/OneDrive/Dokumenty/Text Mining project/rappers"
+
+# clean the text
+# we use the tm functions to clean the texts from punctuation,
+# white spaces, change the letters to lower and remove unimportant words
+cleanCorp = function(corpus)
+{
+  corpus1 = tm_map(corpus, removePunctuation) #remove punctuation
+  corpus1 = tm_map(corpus1, stripWhitespace)  #remove whitespaces
+  corpus1 = tm_map(corpus1, content_transformer(tolower)) #all letters low
+  corpus1 = tm_map(corpus1, removeWords, stopwords("english")) #remove unnecessary words
+  return(corpus1) #return the corpus
+}
+
+# build the matrix of terms - Term Document Matrix
+
+generateTDMatrix = function(author, path)
+{
+  # setting the directory of the track
+  track.dir = sprintf("%s/%s", path, author) #concatenation of the path and folder with
+  # songs of appriopriate author
+  # creating track corpus
+  track.corpus = VCorpus(DirSource(directory = track.dir), readerControl = list(reader=readPlain))
+  # clean the corpus with the function created
+  track.corpus.cleaned = cleanCorp(track.corpus)
+  # quantifing the terms that appeared in the texts in the form of matrix
+  track.terms.matrix = TermDocumentMatrix(track.corpus.cleaned)
+  # remove sparse terms form matrix
+  track.terms.matrix = removeSparseTerms(track.terms.matrix, 0.4)
+  #return result
+  result = list(name = author, tdm = track.terms.matrix)
+}
+
+# creating the tdm object by applying the generateTDMatrix on folders with songs of both
+# authors
+
+tdm = lapply(authors, generateTDMatrix, path = pathname)
+str(tdm)
+
+# Linking names of authors
+
+linkAuthortoTDM = function(tdm){
+  author.matrix = t(data.matrix(tdm[["tdm"]])) # transposing the tdm content of tdm
+  author.dataframe = as.data.frame(author.matrix, stringAsFactors = FALSE)
+  # changing the matrix to dataframe
+  author.dataframe = cbind(author.dataframe,
+                           rep(tdm[["name"]], nrow(author.dataframe)))
+  # assigning the names to the rows of dataframe with appriopriate name
+  colnames(author.dataframe)[ncol(author.dataframe)] = "targetAuthor"
+  # naming the last column
+  return(author.dataframe)
+}
+
+# Applying the linkAuthortoTDM function to tdm object
+authorTDM = lapply(tdm, linkAuthortoTDM)
+#authorTDM
+
+# Stack together the dataframes
+tdm.stack = do.call(rbind.fill, authorTDM)
+# Replacing the NA's with 0
+tdm.stack[is.na(tdm.stack)] = 0
+
+# head(tdm.stack)
+# nrow(tdm.stack)
+# ncol(tdm.stack)
+
+res = c()
+for (j in 1:10){
+  for (i in 1:100){
+    # Sample to create the training and test set 
+    
+    trainingset = sample(nrow(tdm.stack), ceiling(nrow(tdm.stack)*0.7))
+    testset = (1:nrow(tdm.stack))[-trainingset]
+    
+    # The class and variables
+    
+    tdm.author = tdm.stack[, "targetAuthor"] #class
+    tdm.stack.rest = tdm.stack[, !colnames(tdm.stack) %in% "targetAuthor"] #variables
+    
+    # Classification model
+    
+    knn.pred = knn(tdm.stack.rest[trainingset, ], tdm.stack.rest[testset, ],
+                   tdm.author[trainingset], k=j)
+    #Confusion Matrix
+    tab1 = table("Predictions" = knn.pred, "Actual" = tdm.author[testset])
+    #cm = confusionMatrix(tab1)
+    res[i] = (tab1[1,1]+tab1[2,2])/(tab1[1,1]+tab1[1,2]+tab1[2,1]+tab1[2,2])
+  }
+  print("Number of nearest neighbours:")
+  print(j)
+  print(mean(res))
+  print(sd(res))
+}
+
+
+# Conclusion:
+
+# The model is able to properly classify the songs to authors with the score of:
+# Balanced Accuracy = 90% and standard deviation of 4.5%
+# The score depends on the sample of the train set and test set. Some of the songs
+# contribute to the term document matrix better than other and therefore they impact
+# the performance of the model. The code was a run 100 times and brought different results.
+# Also the knn algorithm was launched for different values of k <1;10>. From the results
+# the k = 1 was chosen for the final model.
+
+
+
+
+
+
+
+
